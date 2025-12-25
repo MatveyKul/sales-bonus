@@ -64,15 +64,13 @@ function calculateBonusByProfit(index, total, seller) {
  * @returns {{revenue, top_products, bonus, name, sales_count, profit, seller_id}[]}
  */
 function analyzeSalesData(data, options) {
-
     // @TODO: Проверка входных данных
-    // ДОБАВЛЕНО: проверка на пустой массив products
     if (!data
         || !Array.isArray(data.sellers)
         || !Array.isArray(data.products)
         || !Array.isArray(data.purchase_records)
         || data.sellers.length === 0
-        || data.products.length === 0      // ← ДОБАВЛЕНО
+        || data.products.length === 0
         || data.purchase_records.length === 0
     ) {
         throw new Error('Некорректные входные данные');
@@ -102,7 +100,8 @@ function analyzeSalesData(data, options) {
     // @TODO: Подготовка промежуточных данных для сбора статистики
     const sellerStats = data.sellers.map(seller => ({
         seller_id: seller.id,
-        name: seller.name, // ← УБРАТЬ fallback
+        // Пробуем разные варианты поля с именем
+        name: seller.name || seller.full_name || seller.seller_name || String(seller.id),
         sales_count: 0,
         revenue: 0,
         profit: 0,
@@ -131,44 +130,43 @@ function analyzeSalesData(data, options) {
         
         seller.sales_count += 1;
         
-        // Если есть total_amount, используем его
-        if (record.total_amount != null) {
-            seller.revenue += record.total_amount;
-        }
+        // Инициализируем переменные для этого чека
+        let recordRevenue = 0;
+        let recordCost = 0;
 
-        let totalCost = 0;
-        let totalProfit = 0;
-
+        // Обрабатываем каждый товар в чеке
         record.items.forEach(item => {
             const product = productIndex[item.sku];
             
+            // Расчет себестоимости
             const cost = product && product.purchase_price != null 
                 ? product.purchase_price * item.quantity 
                 : 0;
-            totalCost += cost;
+            recordCost += cost;
             
+            // Расчет выручки от товара
             const itemRevenue = calculateRevenue(item, product);
-            const itemProfit = itemRevenue - cost;
-            totalProfit += itemProfit;
+            recordRevenue += itemRevenue;
             
+            // Учет проданных товаров
             if (seller.products_sold[item.sku] === undefined) {
                 seller.products_sold[item.sku] = 0;
             }
             seller.products_sold[item.sku] += item.quantity;
         });
         
-        seller.cost_total += totalCost;
-        seller.profit += totalProfit;
-        
-        // Если total_amount не был предоставлен, пересчитываем revenue из товаров
-        if (record.total_amount == null) {
-            let calculatedRevenue = 0;
-            record.items.forEach(item => {
-                const product = productIndex[item.sku];
-                calculatedRevenue += calculateRevenue(item, product);
-            });
-            seller.revenue += calculatedRevenue;
+        // Обновляем общие показатели продавца
+        if (record.total_amount != null) {
+            // Если есть total_amount, используем его для revenue
+            seller.revenue += record.total_amount;
+        } else {
+            // Иначе используем рассчитанную выручку
+            seller.revenue += recordRevenue;
         }
+        
+        seller.cost_total += recordCost;
+        // Прибыль = Выручка - Себестоимость
+        seller.profit = seller.revenue - seller.cost_total;
     });
 
     // @TODO: Сортировка продавцов по прибыли
@@ -180,10 +178,9 @@ function analyzeSalesData(data, options) {
         seller.bonus = calculateBonus(index, sellerStats.length, seller);
         
         // Формирование топ-10 товаров
-        // ИСПРАВЛЕНО: product_id → sku
         const productsArray = Object.entries(seller.products_sold)
             .map(([product_id, quantity]) => ({
-                sku: product_id, // ← ИЗМЕНЕНО
+                sku: product_id,
                 quantity
             }))
             .sort((a, b) => b.quantity - a.quantity)
