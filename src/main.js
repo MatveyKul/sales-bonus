@@ -42,13 +42,13 @@ function calculateBonusByProfit(index, total, seller) {
     const { profit } = seller;
     
     if (index === 0) {
-        return profit * 0.15;
+        return Math.round(profit * 0.15 * 100) / 100;
     } else if (index === 1 || index === 2) {
-        return profit * 0.10;
+        return Math.round(profit * 0.10 * 100) / 100;
     } else if (index === total - 1) {
         return 0;
     } else {
-        return profit * 0.05;
+        return Math.round(profit * 0.05 * 100) / 100;
     }
 }
 
@@ -100,7 +100,6 @@ function analyzeSalesData(data, options) {
         revenue: 0,
         profit: 0,
         bonus: 0,
-        cost_total: 0,
         products_sold: {}
     }));
 
@@ -125,9 +124,8 @@ function analyzeSalesData(data, options) {
         // Увеличить количество продаж на 1
         seller.sales_count += 1;
         
-        // Увеличить общую сумму выручки на total_amount из чека
-        seller.revenue += record.total_amount;
-        
+        seller.revenue += record.total_amount - record.total_discount;
+
         // Расчёт прибыли для каждого товара в чеке
         record.items.forEach(item => {
             const product = productIndex[item.sku];
@@ -139,10 +137,10 @@ function analyzeSalesData(data, options) {
             
             // Посчитать себестоимость товара
             const cost = product.purchase_price * item.quantity;
-            seller.cost_total += cost;
             
             // Посчитать выручку с учётом скидки через функцию calculateRevenue
             const itemRevenue = calculateRevenue(item, product);
+            
             // Прибыль: выручка минус себестоимость
             seller.profit += (itemRevenue - cost);
             
@@ -157,7 +155,7 @@ function analyzeSalesData(data, options) {
     // Сортировка продавцов по прибыли (убывание)
     sellerStats.sort((a, b) => b.profit - a.profit);
 
-    // Назначение премий на основе ранжирования
+    // Назначение премий на основе ранжирование
     sellerStats.forEach((seller, index) => {
         // Рассчитываем бонус
         seller.bonus = calculateBonus(index, sellerStats.length, seller);
@@ -176,10 +174,10 @@ function analyzeSalesData(data, options) {
     return sellerStats.map(seller => ({
         seller_id: seller.seller_id,
         name: seller.name,
-        revenue: +seller.revenue.toFixed(2),
-        profit: +seller.profit.toFixed(2),
+        revenue: parseFloat(seller.revenue.toFixed(2)),
+        profit: parseFloat(seller.profit.toFixed(2)),
         sales_count: seller.sales_count,
         top_products: seller.top_products,
-        bonus: +seller.bonus.toFixed(2)
+        bonus: parseFloat(seller.bonus.toFixed(2))
     }));
 }
