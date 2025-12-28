@@ -23,7 +23,7 @@ function calculateSimpleRevenue(purchase, _product) {
     const fullPrice = sale_price * quantity;
     const revenueWithDiscount = fullPrice * (1 - decimalDiscount);
     
-    return Math.round(revenueWithDiscount * 100) / 100;
+    return revenueWithDiscount;
 }
 
 /**
